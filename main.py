@@ -1,38 +1,45 @@
-# To run and test the code you need to update 4 places:
-# 1. Change MY_EMAIL/MY_PASSWORD to your own details.
-# 2. Go to your email provider and make it allow less secure apps.
-# 3. Update the SMTP ADDRESS to match your email provider.
-# 4. Update birthdays.csv to contain today's month and day.
-# See the solution video in the 100 Days of Python Course for explainations.
-
-
-from datetime import datetime
-import pandas
-import random
-import smtplib
+from dotenv import load_dotenv
+import requests
 import os
+from twilio.rest import Client
 
-# import os and use it to get the Github repository secrets
-MY_EMAIL = os.environ.get("MY_EMAIL")
-MY_PASSWORD = os.environ.get("MY_PASSWORD")
+load_dotenv()
 
-today = datetime.now()
-today_tuple = (today.month, today.day)
 
-data = pandas.read_csv("birthdays.csv")
-birthdays_dict = {(data_row["month"], data_row["day"])                  : data_row for (index, data_row) in data.iterrows()}
-if today_tuple in birthdays_dict:
-    birthday_person = birthdays_dict[today_tuple]
-    file_path = f"letter_templates/letter_{random.randint(1, 3)}.txt"
-    with open(file_path) as letter_file:
-        contents = letter_file.read()
-        contents = contents.replace("[NAME]", birthday_person["name"])
+current_location_lat = 5.612942
+current_location_lon = 5.863023
 
-    with smtplib.SMTP("YOUR EMAIL PROVIDER SMTP SERVER ADDRESS") as connection:
-        connection.starttls()
-        connection.login(MY_EMAIL, MY_PASSWORD)
-        connection.sendmail(
-            from_addr=MY_EMAIL,
-            to_addrs=birthday_person["email"],
-            msg=f"Subject:Happy Birthday!\n\n{contents}"
-        )
+account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+api_key = os.getenv("OWM_API_KEY")
+
+weather_params = {
+    "lat": 5.612934256300603,
+    "lon": 5.8630226273733586,
+    "appid": api_key,
+    "cnt": 4
+}
+
+response = requests.get(url="https://api.openweathermap.org/data/2.5/forecast", params=weather_params)
+response.raise_for_status()
+weather_data = response.json()
+# print(json.dumps(response, indent=4))
+
+will_rain = False
+counter = 0
+for i in weather_data['list']:
+    if weather_data['list'][counter]['weather'][0]['id'] < 700:
+        print(weather_data['list'][counter]['weather'][0]['id'])
+        will_rain = True
+    counter += 1
+if will_rain:
+    client = Client(account_sid, auth_token)
+    message = client.messages.create(
+        from_='+16824185842', # Using SMS
+        # from_='whatsapp:+14155238886', # Using WhatsApp
+        body="It's going to rain today, remember to carry an ☂",
+        to = '+2349036549273' # Using SMS
+        # to='whatsapp:+2347057341712' # Using WhatsApp
+    )
+    print(message.sid)
+    print(message.status)
